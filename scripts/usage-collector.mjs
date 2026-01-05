@@ -17,22 +17,23 @@
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
+import Conf from 'conf';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const DATA_DIR = path.join(__dirname, '../data');
+const config = new Conf({ projectName: 'glm-monitor' });
+const DATA_DIR = path.join(os.homedir(), '.glm-monitor');
 const HISTORY_FILE = path.join(DATA_DIR, 'usage-history.json');
 const MAX_HISTORY_ENTRIES = 288; // 24 hours * 12 (5-min intervals)
 
-// Read environment variables
-const baseUrl = process.env.ANTHROPIC_BASE_URL || '';
-const authToken = process.env.ANTHROPIC_AUTH_TOKEN || '';
+// Read configuration
+const baseUrl = config.get('baseUrl') || process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/anthropic';
+const authToken = config.get('authToken') || process.env.ANTHROPIC_AUTH_TOKEN;
 
-if (!authToken || !baseUrl) {
-  console.error('Error: Required environment variables not set');
-  console.error('Set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN');
+// Validation
+if (!authToken) {
+  console.error('\x1b[31mError: GLM Auth Token not configured.\x1b[0m');
+  console.error('\x1b[33mRun `glm-monitor init` to set up your credentials.\x1b[0m');
   process.exit(1);
 }
 
@@ -142,8 +143,12 @@ async function collectUsage() {
     ]);
 
     // Extract current totals
-    const modelTotal = modelData.data?.totalUsage || {};
-    const toolTotal = toolData.data?.totalUsage || {};
+    const modelTotal = modelData.data?.totalUsage;
+    const toolTotal = toolData.data?.totalUsage;
+
+    if (!modelTotal || !toolTotal) {
+      throw new Error('API response missing expected totalUsage data structure');
+    }
 
     // Find current quota percentage
     const tokenQuota = quotaData.data?.limits?.find(l => l.type === 'TOKENS_LIMIT') || {};
@@ -161,6 +166,14 @@ async function collectUsage() {
 
     // Load and update history
     const history = loadHistory();
+
+    // Prevention: Check if the last entry is the same (ignoring milliseconds if any)
+    const latestExisting = history.entries[history.entries.length - 1];
+    if (latestExisting && latestExisting.timestamp === entry.timestamp) {
+      console.log('  ! Entry already exists for this second, skipping.');
+      return;
+    }
+
     history.entries.push(entry);
 
     // Trim to max entries

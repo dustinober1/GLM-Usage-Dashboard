@@ -1,17 +1,40 @@
 {
-  "name": "zlm-usage-dashboard",
+  "name": "glm-monitor",
   "version": "1.0.0",
-  "description": "Real-time dashboard for monitoring GLM Coding Plan API usage",
-  "main": "index.html",
-  "scripts": {
-    "collect": "./collect.sh",
-    "start": "npx http-server . -p 8080 -o",
-    "monitor": "npm run collect && npm run start"
+  "description": "Professional dashboard for monitoring GLM Coding Plan API usage",
+  "type": "module",
+  "bin": {
+    "glm-monitor": "./bin/glm-monitor.js"
   },
-  "keywords": ["glm", "usage", "monitoring", "dashboard"],
-  "author": "",
-  "license": "MIT",
+  "files": [
+    "bin",
+    "dist",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "collect": "node scripts/usage-collector.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node bin/glm-monitor.js start",
+    "monitor": "node bin/glm-monitor.js monitor"
+  },
+  "keywords": [
+    "glm",
+    "usage",
+    "monitoring",
+    "dashboard",
+    "cli"
+  ],
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "commander": "^14.0.2",
+    "conf": "^15.0.2",
+    "opn": "^5.5.0"
+  },
   "devDependencies": {
-    "http-server": "^14.1.1"
-  }
+    "vite": "^5.0.0"
+  },
+  "license": "MIT"
 }

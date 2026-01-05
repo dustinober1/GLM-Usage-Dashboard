@@ -55,14 +55,30 @@
       "mcpCalls": 6,
       "tokenQuotaPercent": 12,
       "timeQuotaPercent": 1
+    },
+    {
+      "timestamp": "2026-01-05T15:52:21.385Z",
+      "modelCalls": 7044,
+      "tokensUsed": 279846280,
+      "mcpCalls": 6,
+      "tokenQuotaPercent": 14,
+      "timeQuotaPercent": 1
+    },
+    {
+      "timestamp": "2026-01-05T15:53:18.705Z",
+      "modelCalls": 7044,
+      "tokensUsed": 279846280,
+      "mcpCalls": 6,
+      "tokenQuotaPercent": 14,
+      "timeQuotaPercent": 1
     }
   ],
-  "lastUpdated": "2026-01-05T15:41:20.467Z",
+  "lastUpdated": "2026-01-05T15:53:18.706Z",
   "quotaLimits": {
     "tokenQuota": {
-      "current": 25695674,
+      "current": 29479679,
       "max": 200000000,
-      "percentage": 12
+      "percentage": 14
     },
     "timeQuota": {
       "current": 7,
