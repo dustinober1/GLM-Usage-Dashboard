@@ -1,4 +1,4 @@
-# GLM Monitor
+# @dustinober/glm-monitor
 
 A professional dashboard for monitoring your GLM Coding Plan API usage and quotas. Track tokens, model calls, MCP tool usage, and quota limits in real-time.
 
@@ -18,7 +18,7 @@ A professional dashboard for monitoring your GLM Coding Plan API usage and quota
 ### Option 1: Global Install (Recommended)
 
 ```bash
-npm install -g glm-monitor
+npm install -g @dustinober/glm-monitor
 ```
 
 This installs the `glm-monitor` CLI tool globally, available from anywhere.
@@ -27,7 +27,7 @@ This installs the `glm-monitor` CLI tool globally, available from anywhere.
 
 ```bash
 git clone <repo-url>
-cd GLM_Dashboard
+cd glm-monitor
 npm install
 ```
 
@@ -40,7 +40,7 @@ npm install
 glm-monitor init
 
 # Or if using project directly
-npx glm-monitor init
+npx @dustinober/glm-monitor init
 ```
 
 You can also set your token explicitly:

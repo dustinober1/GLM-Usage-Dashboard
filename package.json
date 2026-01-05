@@ -1,14 +1,14 @@
 {
-  "name": "glm-monitor",
+  "name": "@dustinober/glm-monitor",
   "version": "1.0.0",
   "description": "Professional dashboard for monitoring GLM Coding Plan API usage",
-  "homepage": "https://github.com/dustinober1/GLM-Usage-Dashboard#readme",
+  "homepage": "https://github.com/dustinober1/glm-monitor#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dustinober1/GLM-Usage-Dashboard.git"
+    "url": "git+https://github.com/dustinober1/glm-monitor.git"
   },
   "bugs": {
-    "url": "https://github.com/dustinober1/GLM-Usage-Dashboard/issues"
+    "url": "https://github.com/dustinober1/glm-monitor/issues"
   },
   "type": "module",
   "bin": {
@@ -22,7 +22,7 @@
     "README.md"
   ],
   "scripts": {
-    "prepack": "npm run build",
+    "prepare": "npm run build",
     "collect": "node scripts/usage-collector.mjs",
     "dev": "vite",
     "build": "vite build",
