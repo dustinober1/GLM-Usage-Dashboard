@@ -1,0 +1,17 @@
+{
+  "name": "zlm-usage-dashboard",
+  "version": "1.0.0",
+  "description": "Real-time dashboard for monitoring GLM Coding Plan API usage",
+  "main": "index.html",
+  "scripts": {
+    "collect": "./collect.sh",
+    "start": "npx http-server . -p 8080 -o",
+    "monitor": "npm run collect && npm run start"
+  },
+  "keywords": ["glm", "usage", "monitoring", "dashboard"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
