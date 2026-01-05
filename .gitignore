@@ -1,7 +1,5 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
 
 # Testing
 coverage/
@@ -17,6 +15,8 @@ data/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# macOS
 .DS_Store
 
 # IDEs
@@ -28,16 +28,15 @@ data/
 *.sln
 *.sw?
 
-# Dashboard Specific
-.gemini/
-.claude/
-.agent/
-brain/
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-data/
-node_modules/
+# Dashboard Specific
+.gemini/
+.claude/
+.agent/
+brain/
 .playwright-mcp/

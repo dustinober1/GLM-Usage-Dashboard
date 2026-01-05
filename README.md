@@ -1,86 +1,134 @@
-# GLM Usage Dashboard
+# GLM Monitor
 
-A real-time web dashboard for monitoring your GLM Coding Plan API usage and quotas.
+A professional dashboard for monitoring your GLM Coding Plan API usage and quotas. Track tokens, model calls, MCP tool usage, and quota limits in real-time.
 
 ## Features
 
-- 📊 Real-time usage statistics (tokens, calls, MCP tools)
-- 📈 Historical charts with 24-hour data retention
-- ⚠️ Quota alerts when approaching limits
-- 🔄 Auto-refresh every 30 seconds
-- 💾 Persistent data storage
+- 📊 **Real-time metrics** - Tokens, model calls, and MCP tool usage
+- 📈 **Historical charts** - 24-hour data retention with auto-refresh
+- ⚠️ **Quota alerts** - Visual warnings when approaching limits
+- 🔄 **Auto-refresh** - Dashboard updates every 30 seconds
+- 💾 **Persistent storage** - Data survives restarts
+- 📤 **Export** - Download data as CSV
 
-## Quick Start
+## Installation
 
-### 1. Install Dependencies
+### Option 1: Global Install (Recommended)
 
 ```bash
+npm install -g glm-monitor
+```
+
+This installs the `glm-monitor` CLI tool globally, available from anywhere.
+
+### Option 2: Project Install
+
+```bash
+git clone <repo-url>
+cd GLM_Dashboard
 npm install
 ```
 
-### 2. Collect Usage Data
+## Quick Start
+
+### 1. Initialize Configuration
 
 ```bash
-# Run once to collect current usage
+# If globally installed
+glm-monitor init
+
+# Or if using project directly
+npx glm-monitor init
+```
+
+Or set your token explicitly:
+
+```bash
+glm-monitor init -t "YOUR_AUTH_TOKEN_HERE"
+```
+
+### 2. Collect Data
+
+```bash
+# Collect current usage
 npm run collect
 
-# Or set up automatic collection every 5 minutes
-watch -n 300 npm run collect
+# Or using the CLI
+glm-monitor collect
 ```
 
-### 3. View Dashboard
+### 3. Open Dashboard
 
 ```bash
-# Start the dashboard (collects data first)
+# Collect data then open dashboard
 npm run monitor
 
-# Or open the dashboard directly
-npm start
+# Or using the CLI
+glm-monitor monitor
 ```
 
-The dashboard will open at `http://localhost:8080`
+The dashboard opens at `http://localhost:8080` (or port 5173 in dev mode).
+
+## Development Mode
+
+For development with hot-reload:
+
+```bash
+npm run dev
+```
+
+Then open `http://localhost:5173` in your browser.
+
+| Mode | URL | Description |
+|------|-----|-------------|
+| Dev | `http://localhost:5173` | Hot-reload, Vite dev server |
+| Prod | `http://localhost:8080` | Built version, serves data |
 
 ## NPM Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run collect` | Collect current usage data from API |
-| `npm start` | Open the dashboard web interface |
+| `npm run collect` | Collect usage data from API |
+| `npm start` | Launch the dashboard |
 | `npm run monitor` | Collect data then open dashboard |
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
 
-## Data Storage
+## CLI Commands
 
-Usage data is stored in `~/.glm-monitor/usage-history.json`:
-- **Retention:** 288 entries (24 hours at 5-min intervals)
-- **Format:** JSON with timestamped entries
-- **Size:** ~50KB for full 24-hour history
+```bash
+# Initialize/update configuration
+glm-monitor init [-t TOKEN] [-u URL]
 
-> **Note:** The dev dashboard uses a symlink (`data/usage-history.json` → `~/.glm-monitor/usage-history.json`) to access the data. This is created automatically by `npm run collect`.
+# Collect current usage
+glm-monitor collect
+
+# Collect and open dashboard
+glm-monitor monitor
+
+# Start dashboard server
+glm-monitor start [-p PORT]
+```
 
 ## Dashboard Metrics
 
-### Current Usage
-- **Total Tokens Used:** Cumulative token consumption
-- **Total Model Calls:** Number of API calls made
-- **MCP Tool Calls:** Tool usage count (search, web-reader, zread)
+### Current Usage Cards
+- **Compute Tokens** - Total tokens consumed with trend indicator
+- **API Manifestations** - Total model calls made
+- **MCP Tool Navigations** - Tool invocation count (search, web-reader, zread)
 
 ### Quota Tracking
-- **Token Quota (5-hour rolling):** % of token limit used
-- **Time Quota (1-month):** % of MCP call limit used
+- **Neural Token Capacity** (5-hour rolling) - % of token limit used
+- **Temporal Access Quota** (monthly) - % of MCP call limit used
 
-### Color Indicators
+### Visual Indicators
 - 🟢 **Green:** < 50% used
 - 🟡 **Yellow:** 50-80% used
-- 🔴 **Red:** > 80% used (alert triggered)
-
-## Charts
-
-1. **Token Usage Over Time** - Line chart showing token consumption
-2. **Model Calls Over Time** - API call frequency
-3. **MCP Tool Usage** - Tool invocation trends
-4. **Quota Utilization** - Both quotas tracked over time
+- 🔴 **Red:** > 80% used
 
 ## Automation
+
+Set up automatic data collection every 5 minutes.
 
 ### macOS (launchd)
 
@@ -95,19 +143,22 @@ Create `~/Library/LaunchAgents/com.user.usage-monitor.plist`:
   <string>com.user.usage-monitor</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/npm</string>
+    <string>usr/local/bin/npm</string>
     <string>run</string>
     <string>collect</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/dustinober/Projects/ZLM_Dashboard</string>
+  <string>/path/to/GLM_Dashboard</string>
   <key>StartInterval</key>
   <integer>300</integer>
 </dict>
 </plist>
 ```
 
-Load with: `launchctl load ~/Library/LaunchAgents/com.user.usage-monitor.plist`
+Load with:
+```bash
+launchctl load ~/Library/LaunchAgents/com.user.usage-monitor.plist
+```
 
 ### Linux (cron)
 
@@ -117,36 +168,62 @@ crontab -e
 
 Add:
 ```
-*/5 * * * * cd /Users/dustinober/Projects/ZLM_Dashboard && npm run collect
+*/5 * * * * cd /path/to/GLM_Dashboard && npm run collect
 ```
 
-## Environment Variables
+## Data Storage
 
-The collector script requires these environment variables (already set if you're using GLM Coding Plan):
+| Location | Purpose |
+|----------|---------|
+| `~/.glm-monitor/usage-history.json` | Persistent data storage |
+| `~/.glm-monitor/config.json` | Auth token and API settings |
 
-```bash
-ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-ANTHROPIC_AUTH_TOKEN="your-token-here"
-```
+- **Retention:** 288 entries (24 hours at 5-min intervals)
+- **Auto-trim:** Old entries removed automatically
 
 ## Troubleshooting
 
-**No data showing:**
-- Run `npm run collect` once to initialize the data file
-- Check that `ANTHROPIC_AUTH_TOKEN` is set correctly
+### "token expired or incorrect"
+Your auth token has expired. Re-initialize:
+```bash
+glm-monitor init -t "YOUR_NEW_TOKEN"
+```
 
-**Charts not updating:**
-- Refresh the page manually
-- Check browser console for errors
-- Verify `data/usage-history.json` exists
+### No data showing in dashboard
+1. Run `npm run collect` to fetch initial data
+2. Verify `~/.glm-monitor/usage-history.json` exists
+3. Check browser console for errors
 
-**CORS errors:**
-- Make sure you're accessing via `http://localhost:8080`, not `file://`
-- The dashboard uses HTTP server to avoid CORS restrictions
+### Charts not updating
+1. Click the **"Sync Now"** button to manually refresh
+2. Dashboard auto-refreshes every 30 seconds
+3. Verify data file is being updated: `ls -la ~/.glm-monitor/`
 
-## Security Note
+### CORS errors
+- Access via `http://localhost:5173` (dev) or `http://localhost:8080` (prod)
+- Do not open `index.html` directly as a file
 
-This dashboard is for local monitoring only:
-- Data stored locally (no external transmission)
-- Dashboard runs on localhost only
-- No authentication required (local use)
+## Configuration
+
+The dashboard uses these environment variables (optional, overrides config):
+
+```bash
+export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+export ANTHROPIC_AUTH_TOKEN="your-token-here"
+```
+
+Or store permanently via `glm-monitor init`.
+
+## API Endpoints
+
+The collector queries these GLM Monitoring API endpoints:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/monitor/usage/model-usage` | Token and call statistics |
+| `/api/monitor/usage/tool-usage` | MCP tool invocation counts |
+| `/api/monitor/usage/quota/limit` | Current quota limits and usage |
+
+## License
+
+MIT
