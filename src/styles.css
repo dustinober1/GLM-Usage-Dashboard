@@ -228,8 +228,24 @@ header {
 }
 
 /* Charts */
+.charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 24px;
+}
+
+.chart-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card .chart-container {
+    margin-top: 0;
+    flex: 1;
+    min-height: 300px;
+}
+
 .chart-container {
-    margin-top: 24px;
     height: 350px;
 }
 
@@ -254,6 +270,10 @@ header {
     }
 
     .quota-section {
+        grid-template-columns: 1fr;
+    }
+
+    .charts-row {
         grid-template-columns: 1fr;
     }
 }

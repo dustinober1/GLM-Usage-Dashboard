@@ -47,27 +47,26 @@ Or set your token explicitly:
 glm-monitor init -t "YOUR_AUTH_TOKEN_HERE"
 ```
 
-### 2. Collect Data
+### 2. Open Dashboard
 
 ```bash
-# Collect current usage
-npm run collect
+# Automatically collects data, then opens dashboard
+npm start
 
 # Or using the CLI
-glm-monitor collect
-```
-
-### 3. Open Dashboard
-
-```bash
-# Collect data then open dashboard
-npm run monitor
-
-# Or using the CLI
-glm-monitor monitor
+glm-monitor start
 ```
 
 The dashboard opens at `http://localhost:8080` (or port 5173 in dev mode).
+
+**Data is automatically collected:**
+- On `npm start` / `glm-monitor start` - collects fresh data before opening
+- On `npm run monitor` / `glm-monitor monitor` - collects before opening
+
+Use `--no-collect` to skip collection:
+```bash
+glm-monitor start --no-collect
+```
 
 ## Development Mode
 
@@ -88,9 +87,9 @@ Then open `http://localhost:5173` in your browser.
 
 | Command | Description |
 |---------|-------------|
-| `npm run collect` | Collect usage data from API |
-| `npm start` | Launch the dashboard |
-| `npm run monitor` | Collect data then open dashboard |
+| `npm start` | Collect data and launch dashboard |
+| `npm run collect` | Manually collect usage data |
+| `npm run monitor` | Collect data and open dashboard |
 | `npm run dev` | Start development server |
 | `npm run build` | Build for production |
 
@@ -100,14 +99,14 @@ Then open `http://localhost:5173` in your browser.
 # Initialize/update configuration
 glm-monitor init [-t TOKEN] [-u URL]
 
-# Collect current usage
-glm-monitor collect
+# Start dashboard (auto-collects data)
+glm-monitor start [--no-collect] [-p PORT]
 
 # Collect and open dashboard
 glm-monitor monitor
 
-# Start dashboard server
-glm-monitor start [-p PORT]
+# Manual data collection
+glm-monitor collect
 ```
 
 ## Dashboard Metrics

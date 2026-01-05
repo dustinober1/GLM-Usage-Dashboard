@@ -5,7 +5,8 @@ const DATA_URL = '/data/usage-history.json';
 const REFRESH_INTERVAL = 30000;
 const MIN_REFRESH_DELAY = 800; // Show "Syncing..." for at least 800ms
 
-let usageChart = null;
+let tokenChart = null;
+let callsChart = null;
 
 const state = {
   data: null,
@@ -21,26 +22,6 @@ function formatNumber(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toLocaleString();
-}
-
-/**
- * Calculate forecasting (simple linear projection)
- */
-function calculateForecast(entries, limitObj) {
-  if (entries.length < 2) return null;
-  const first = entries[0];
-  const last = entries[entries.length - 1];
-  const timeDiff = new Date(last.timestamp) - new Date(first.timestamp);
-  const usageDiff = last.tokensUsed - first.tokensUsed;
-
-  if (timeDiff <= 0) return null;
-
-  const usagePerHour = (usageDiff / timeDiff) * 3600000;
-  return {
-    usagePerHour,
-    tokensRemaining: limitObj.max - limitObj.current,
-    hoursRemaining: (limitObj.max - limitObj.current) / usagePerHour
-  };
 }
 
 /**
@@ -91,11 +72,12 @@ function renderQuotaCard(id, title, limitObj) {
 }
 
 /**
- * Update Chart
+ * Update Charts
  */
 function updateCharts(entries) {
-  const ctx = document.getElementById('usageChart');
-  if (!ctx) return;
+  const tokenCtx = document.getElementById('tokenChart');
+  const callsCtx = document.getElementById('callsChart');
+  if (!tokenCtx || !callsCtx) return;
 
   const labels = entries.map(e => {
     const d = new Date(e.timestamp);
@@ -105,36 +87,26 @@ function updateCharts(entries) {
   const tokenData = entries.map(e => e.tokensUsed / 1000000);
   const callData = entries.map(e => e.modelCalls);
 
-  if (usageChart) {
-    usageChart.data.labels = labels;
-    usageChart.data.datasets[0].data = tokenData;
-    usageChart.data.datasets[1].data = callData;
-    usageChart.update('none');
+  // Token Chart
+  if (tokenChart) {
+    tokenChart.data.labels = labels;
+    tokenChart.data.datasets[0].data = tokenData;
+    tokenChart.update('none');
   } else {
-    usageChart = new Chart(ctx, {
+    tokenChart = new Chart(tokenCtx, {
       type: 'line',
       data: {
         labels,
-        datasets: [
-          {
-            label: 'Tokens (Millions)',
-            data: tokenData,
-            borderColor: '#00d4ff',
-            backgroundColor: 'rgba(0, 212, 255, 0.1)',
-            fill: true,
-            tension: 0.4,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Model Calls',
-            data: callData,
-            borderColor: '#00ff88',
-            backgroundColor: 'rgba(0, 255, 136, 0.1)',
-            fill: true,
-            tension: 0.4,
-            yAxisID: 'y1'
-          }
-        ]
+        datasets: [{
+          label: 'Tokens (Millions)',
+          data: tokenData,
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0, 212, 255, 0.15)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 2,
+          pointHoverRadius: 5
+        }]
       },
       options: {
         responsive: true,
@@ -143,15 +115,47 @@ function updateCharts(entries) {
           legend: { display: false }
         },
         scales: {
-          x: { display: true, grid: { display: false }, ticks: { color: '#6c757d' } },
+          x: { display: true, grid: { display: false }, ticks: { color: '#6c757d', maxTicksLimit: 8 } },
           y: {
-            position: 'left',
             grid: { color: 'rgba(255,255,255,0.05)' },
             ticks: { color: '#00d4ff' }
-          },
-          y1: {
-            position: 'right',
-            grid: { display: false },
+          }
+        }
+      }
+    });
+  }
+
+  // Calls Chart
+  if (callsChart) {
+    callsChart.data.labels = labels;
+    callsChart.data.datasets[0].data = callData;
+    callsChart.update('none');
+  } else {
+    callsChart = new Chart(callsCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'API Calls',
+          data: callData,
+          borderColor: '#00ff88',
+          backgroundColor: 'rgba(0, 255, 136, 0.15)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 2,
+          pointHoverRadius: 5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { display: true, grid: { display: false }, ticks: { color: '#6c757d', maxTicksLimit: 8 } },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
             ticks: { color: '#00ff88' }
           }
         }
@@ -198,7 +202,8 @@ async function fetchData(isManualRefresh = false) {
     state.data = data;
     state.loading = false;
     state.refreshing = false;
-    usageChart = null; // Reset chart so it gets recreated with new canvas
+    tokenChart = null;
+    callsChart = null;
     render();
   } catch (err) {
     console.error('Fetch error', err);
@@ -264,12 +269,22 @@ function render() {
         <div id="q-time"></div>
       </div>
 
-      <div class="card">
-        <div class="quota-header">
-           <div class="quota-title">Resource Utilization History</div>
+      <div class="charts-row">
+        <div class="card chart-card">
+          <div class="quota-header">
+            <div class="quota-title">Token Usage (Millions)</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="tokenChart"></canvas>
+          </div>
         </div>
-        <div class="chart-container">
-          <canvas id="usageChart"></canvas>
+        <div class="card chart-card">
+          <div class="quota-header">
+            <div class="quota-title">API Calls</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="callsChart"></canvas>
+          </div>
         </div>
       </div>
     </div>
