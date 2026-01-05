@@ -3,13 +3,15 @@ import Chart from 'chart.js/auto';
 
 const DATA_URL = '/data/usage-history.json';
 const REFRESH_INTERVAL = 30000;
+const MIN_REFRESH_DELAY = 800; // Show "Syncing..." for at least 800ms
 
 let usageChart = null;
 
 const state = {
   data: null,
   loading: true,
-  error: null
+  error: null,
+  refreshing: false
 };
 
 /**
@@ -159,19 +161,51 @@ function updateCharts(entries) {
 }
 
 /**
+ * Update just the refresh button state without rebuilding DOM
+ */
+function updateRefreshButton(refreshing) {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) {
+    btn.textContent = refreshing ? 'Syncing...' : 'Sync Now';
+    btn.disabled = refreshing;
+  }
+}
+
+/**
  * Main Load Function
  */
-async function fetchData() {
+async function fetchData(isManualRefresh = false) {
+  const startTime = Date.now();
+
+  if (isManualRefresh) {
+    state.refreshing = true;
+    updateRefreshButton(true); // Only update button, don't rebuild DOM
+  }
+
   try {
     const res = await fetch(DATA_URL + '?t=' + Date.now());
     if (!res.ok) throw new Error('Data not available. Run collection first.');
     const data = await res.json();
+
+    // Ensure minimum display time for loading state
+    if (isManualRefresh) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < MIN_REFRESH_DELAY) {
+        await new Promise(r => setTimeout(r, MIN_REFRESH_DELAY - elapsed));
+      }
+    }
+
     state.data = data;
     state.loading = false;
+    state.refreshing = false;
+    usageChart = null; // Reset chart so it gets recreated with new canvas
     render();
   } catch (err) {
+    console.error('Fetch error', err);
     state.error = err.message;
     state.loading = false;
+    state.refreshing = false;
+    updateRefreshButton(false); // Reset button on error
     render();
   }
 }
@@ -213,7 +247,9 @@ function render() {
         </div>
         <div class="header-actions">
           <button class="btn" id="exportBtn">Export Data</button>
-          <button class="btn btn-primary" id="refreshBtn">Sync Now</button>
+          <button class="btn btn-primary" id="refreshBtn" ${state.refreshing ? 'disabled' : ''}>
+            ${state.refreshing ? 'Syncing...' : 'Sync Now'}
+          </button>
         </div>
       </header>
 
@@ -240,8 +276,10 @@ function render() {
   `;
 
   // Attach event listeners
-  document.getElementById('refreshBtn').onclick = fetchData;
-  document.getElementById('exportBtn').onclick = exportCSV;
+  const refreshBtn = document.getElementById('refreshBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  if (refreshBtn) refreshBtn.onclick = () => fetchData(true);
+  if (exportBtn) exportBtn.onclick = exportCSV;
 
   // Render sub-components
   renderMetricCard('m-tokens', 'Compute Tokens', formatNumber(latest.tokensUsed), 'tokens', tokenTrend);

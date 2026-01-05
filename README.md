@@ -50,10 +50,12 @@ The dashboard will open at `http://localhost:8080`
 
 ## Data Storage
 
-Usage data is stored in `data/usage-history.json`:
+Usage data is stored in `~/.glm-monitor/usage-history.json`:
 - **Retention:** 288 entries (24 hours at 5-min intervals)
 - **Format:** JSON with timestamped entries
 - **Size:** ~50KB for full 24-hour history
+
+> **Note:** The dev dashboard uses a symlink (`data/usage-history.json` → `~/.glm-monitor/usage-history.json`) to access the data. This is created automatically by `npm run collect`.
 
 ## Dashboard Metrics
 

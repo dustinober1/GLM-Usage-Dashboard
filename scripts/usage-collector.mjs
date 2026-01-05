@@ -26,6 +26,29 @@ const DATA_DIR = path.join(os.homedir(), '.glm-monitor');
 const HISTORY_FILE = path.join(DATA_DIR, 'usage-history.json');
 const MAX_HISTORY_ENTRIES = 288; // 24 hours * 12 (5-min intervals)
 
+// Create symlink for dev dashboard access
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.join(__dirname, '..');
+const DEV_DATA_LINK = path.join(PROJECT_ROOT, 'data', 'usage-history.json');
+
+try {
+  fs.mkdirSync(path.dirname(DEV_DATA_LINK), { recursive: true });
+  // Remove existing link/file if it's broken or not a symlink
+  if (fs.existsSync(DEV_DATA_LINK)) {
+    const stats = fs.lstatSync(DEV_DATA_LINK);
+    if (!stats.isSymbolicLink()) {
+      fs.unlinkSync(DEV_DATA_LINK);
+    }
+  }
+  // Create symlink if it doesn't exist
+  if (!fs.existsSync(DEV_DATA_LINK)) {
+    fs.symlinkSync(HISTORY_FILE, DEV_DATA_LINK);
+  }
+} catch (e) {
+  // Ignore symlink errors (e.g., on Windows without admin permissions)
+}
+
 // Read configuration
 const baseUrl = config.get('baseUrl') || process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/anthropic';
 const authToken = config.get('authToken') || process.env.ANTHROPIC_AUTH_TOKEN;

@@ -40,3 +40,4 @@ yarn-error.log*
 
 data/
 node_modules/
+.playwright-mcp/
