@@ -56,6 +56,29 @@ program
     });
 
 /**
+ * CONFIG Command
+ */
+program
+    .command('config')
+    .description('Manage configuration')
+    .option('--retention <period>', 'Set data retention period (24h, 7d, 30d)')
+    .action((options) => {
+        if (options.retention) {
+            const validPeriods = ['24h', '7d', '30d'];
+            if (!validPeriods.includes(options.retention)) {
+                console.error(`Invalid retention period. Choose from: ${validPeriods.join(', ')}`);
+                return;
+            }
+            config.set('retention', options.retention);
+            console.log(`✓ Retention set to ${options.retention}`);
+        } else {
+            console.log(`Current retention: ${config.get('retention', '24h')}`);
+            console.log(`Auth token: ${config.get('authToken') ? '✓ Set' : '✗ Not set'}`);
+            console.log(`Base URL: ${config.get('baseUrl', 'https://api.z.ai/api/anthropic')}`);
+        }
+    });
+
+/**
  * COLLECT Command
  */
 program
@@ -68,6 +91,85 @@ program
             execSync(`node ${collectorPath}`, { stdio: 'inherit' });
         } catch (err) {
             console.error('Failed to collect data.');
+        }
+    });
+
+
+
+program
+    .command('predict')
+    .description('Predict when quota will be exhausted')
+    .action(async () => {
+        // We need to load history. Since this script doesn't usually load it, we'll implement a simple loader here or reuse if extracted.
+        // For simplicity and avoiding massive refactor, I'll duplicate the simple load logic or assume we can move loadHistory to a shared module later.
+        // But for now, I'll just read the file directly as done in `start` command logic.
+
+        const dataPath = path.join(os.homedir(), '.glm-monitor/usage-history.json');
+        if (!fs.existsSync(dataPath)) {
+            console.error('No usage data available. Run collect first.');
+            return;
+        }
+        const history = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+
+        if (!history.entries || history.entries.length === 0) {
+            console.error('No usage data available. Run collect first.');
+            return;
+        }
+
+        const latest = history.entries[history.entries.length - 1];
+
+        // Re-implement calculation logic here or import. 
+        // Ideally should be shared. For now, inline to minimize file churn.
+
+        function calculateQuotaPrediction(quotaPercent, usageHistory) {
+            const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+            const recentEntries = usageHistory.filter(e => new Date(e.timestamp) >= sixHoursAgo);
+
+            if (recentEntries.length < 2) return null;
+
+            const oldest = recentEntries[0];
+            const latest = recentEntries[recentEntries.length - 1];
+            const hoursElapsed = (new Date(latest.timestamp) - new Date(oldest.timestamp)) / (1000 * 60 * 60);
+            const percentChange = latest.tokenQuotaPercent - oldest.tokenQuotaPercent;
+            const percentPerHour = percentChange / hoursElapsed;
+
+            if (percentPerHour <= 0) return null;
+
+            const remainingPercent = 100 - quotaPercent;
+            const hoursUntilExhausted = remainingPercent / percentPerHour;
+
+            return {
+                hoursUntilExhausted: Math.round(hoursUntilExhausted),
+                rate: percentPerHour.toFixed(2)
+            };
+        }
+
+        const prediction = calculateQuotaPrediction(latest.tokenQuotaPercent, history.entries);
+
+        if (prediction) {
+            console.log(`\n📊 Quota Prediction:`);
+            console.log(`   Current usage: ${latest.tokenQuotaPercent}%`);
+            console.log(`   Time until exhausted: ${prediction.hoursUntilExhausted} hours`);
+            console.log(`   Consumption rate: ${prediction.rate}%/hour\n`);
+        } else {
+            console.log('\nInsufficient data for prediction or quota not increasing.\n');
+        }
+    });
+
+program
+    .command('analytics')
+    .description('Generate analytics reports')
+    .option('--report <type>', 'Report type: summary, rates, peak', 'summary')
+    .option('--period <range>', 'Time range: 1h, 6h, 12h, 24h, 7d, 30d', '24h')
+    .action((options) => {
+        const analyticsPath = path.join(packageRoot, 'scripts/analytics.mjs');
+        try {
+            execSync(`node ${analyticsPath} --report ${options.report} --period ${options.period}`, {
+                stdio: 'inherit'
+            });
+        } catch (e) {
+            // execSync throws if the command fails, but the script handles its own error printing mostly.
+            // We just catch here to prevent ugly stack trace from the runner.
         }
     });
 

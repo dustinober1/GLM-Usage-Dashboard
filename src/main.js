@@ -12,8 +12,18 @@ const state = {
   data: null,
   loading: true,
   error: null,
-  refreshing: false
+  refreshing: false,
+  timeRange: localStorage.getItem('timeRange') || '24h'
 };
+
+const timeRanges = [
+  { value: '1h', label: '1 Hour', entries: 12 },
+  { value: '6h', label: '6 Hours', entries: 72 },
+  { value: '12h', label: '12 Hours', entries: 144 },
+  { value: '24h', label: '24 Hours', entries: 288 },
+  { value: '7d', label: '7 Days', entries: 2016 },
+  { value: '30d', label: '30 Days', entries: 8640 }
+];
 
 /**
  * Format large numbers for display
@@ -22,6 +32,54 @@ function formatNumber(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toLocaleString();
+}
+
+/**
+ * Calculate Usage Rates
+ */
+function calculateRates(entries) {
+  if (entries.length < 2) return null;
+
+  const latest = entries[entries.length - 1];
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const hourlyEntries = entries.filter(e => new Date(e.timestamp) >= oneHourAgo);
+
+  if (hourlyEntries.length < 2) return null;
+
+  const first = hourlyEntries[0];
+  const tokensPerHour = latest.tokensUsed - first.tokensUsed;
+  const callsPerHour = latest.modelCalls - first.modelCalls;
+  // Prevent division by zero
+  const avgTokensPerCall = callsPerHour > 0 ? tokensPerHour / callsPerHour : 0;
+
+  return {
+    tokensPerHour,
+    callsPerHour,
+    avgTokensPerCall
+  };
+}
+
+/**
+ * Render Rate Cards
+ */
+function renderRateCards(rates) {
+  const container = document.getElementById('rates-grid');
+  if (!container || !rates) return;
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="metric-label">Tokens/Hour</div>
+      <div class="metric-value" style="font-size: 2rem">${formatNumber(rates.tokensPerHour)}</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Calls/Hour</div>
+      <div class="metric-value" style="font-size: 2rem">${formatNumber(rates.callsPerHour)}</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Avg Tokens/Call</div>
+      <div class="metric-value" style="font-size: 2rem">${rates.avgTokensPerCall.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+    </div>
+  `;
 }
 
 /**
@@ -47,12 +105,18 @@ function renderMetricCard(id, label, value, unit = '', trend = null) {
 /**
  * Render Quota Card
  */
-function renderQuotaCard(id, title, limitObj) {
+function renderQuotaCard(id, title, limitObj, prediction = null) {
   const container = document.getElementById(id);
   if (!container) return;
 
   const percent = limitObj.percentage;
   const statusClass = percent >= 80 ? 'danger' : (percent >= 50 ? 'warning' : '');
+
+  const predictionHTML = prediction ? `
+    <div class="quota-prediction ${prediction.hoursUntilExhausted < 24 ? 'warning' : ''}">
+      ⏰ Exhaustion in ${prediction.hoursUntilExhausted}h
+    </div>
+  ` : '';
 
   container.innerHTML = `
     <div class="card animate-fade-in">
@@ -67,6 +131,7 @@ function renderQuotaCard(id, title, limitObj) {
         <div>Used: <span>${formatNumber(limitObj.current)}</span></div>
         <div>Limit: <span>${formatNumber(limitObj.max)}</span></div>
       </div>
+      ${predictionHTML}
     </div>
   `;
 }
@@ -230,7 +295,12 @@ function render() {
     return;
   }
 
-  const { entries, quotaLimits, lastUpdated } = state.data;
+  const { entries: allEntries, quotaLimits, lastUpdated, quotaPrediction } = state.data;
+
+  // Filter entries based on time range
+  const rangeConfig = timeRanges.find(r => r.value === state.timeRange) || timeRanges[3];
+  const entries = allEntries.slice(-rangeConfig.entries);
+
   const latest = entries[entries.length - 1];
   const first = entries[0];
 
@@ -252,6 +322,11 @@ function render() {
         </div>
         <div class="header-actions">
           <button class="btn" id="exportBtn">Export Data</button>
+          <div class="time-range-selector">
+            <select id="timeRangeSelect" class="time-range-select">
+              ${timeRanges.map(r => `<option value="${r.value}" ${r.value === state.timeRange ? 'selected' : ''}>${r.label}</option>`).join('')}
+            </select>
+          </div>
           <button class="btn btn-primary" id="refreshBtn" ${state.refreshing ? 'disabled' : ''}>
             ${state.refreshing ? 'Syncing...' : 'Sync Now'}
           </button>
@@ -262,6 +337,11 @@ function render() {
         <div id="m-tokens"></div>
         <div id="m-calls"></div>
         <div id="m-mcp"></div>
+      </div>
+
+      <div class="rates-section" style="margin-bottom: 40px;">
+        <h3 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700;">Usage Rates (Last Hour)</h3>
+        <div id="rates-grid" class="metrics-grid"></div>
       </div>
 
       <div class="quota-section">
@@ -293,15 +373,27 @@ function render() {
   // Attach event listeners
   const refreshBtn = document.getElementById('refreshBtn');
   const exportBtn = document.getElementById('exportBtn');
+  const timeRangeSelect = document.getElementById('timeRangeSelect');
+
   if (refreshBtn) refreshBtn.onclick = () => fetchData(true);
   if (exportBtn) exportBtn.onclick = exportCSV;
+  if (timeRangeSelect) {
+    timeRangeSelect.onchange = (e) => {
+      state.timeRange = e.target.value;
+      localStorage.setItem('timeRange', state.timeRange);
+      render();
+    };
+  }
 
   // Render sub-components
   renderMetricCard('m-tokens', 'Compute Tokens', formatNumber(latest.tokensUsed), 'tokens', tokenTrend);
   renderMetricCard('m-calls', 'API Manifestations', formatNumber(latest.modelCalls), 'calls');
   renderMetricCard('m-mcp', 'MCP Tool Navigations', latest.mcpCalls, 'calls');
 
-  renderQuotaCard('q-tokens', 'Neural Token Capacity', quotaLimits.tokenQuota);
+  const rates = calculateRates(entries);
+  renderRateCards(rates);
+
+  renderQuotaCard('q-tokens', 'Neural Token Capacity', quotaLimits.tokenQuota, quotaPrediction);
   renderQuotaCard('q-time', 'Temporal Access Quota', quotaLimits.timeQuota);
 
   updateCharts(entries);

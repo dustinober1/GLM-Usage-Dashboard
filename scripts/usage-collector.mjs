@@ -24,7 +24,15 @@ import Conf from 'conf';
 const config = new Conf({ projectName: 'glm-monitor' });
 const DATA_DIR = path.join(os.homedir(), '.glm-monitor');
 const HISTORY_FILE = path.join(DATA_DIR, 'usage-history.json');
-const MAX_HISTORY_ENTRIES = 288; // 24 hours * 12 (5-min intervals)
+
+// Calculate max entries based on config
+const retentionPeriod = config.get('retention', '24h');
+const retentionMap = {
+  '24h': 288,
+  '7d': 2016,
+  '30d': 8640
+};
+const MAX_HISTORY_ENTRIES = retentionMap[retentionPeriod] || 288;
 
 // Create symlink for dev dashboard access
 const __filename = fileURLToPath(import.meta.url);
@@ -151,6 +159,30 @@ function saveHistory(history) {
   }
 }
 
+function calculateQuotaPrediction(quotaPercent, usageHistory) {
+  // Use last 6 hours for rate calculation
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  const recentEntries = usageHistory.filter(e => new Date(e.timestamp) >= sixHoursAgo);
+
+  if (recentEntries.length < 2) return null;
+
+  const oldest = recentEntries[0];
+  const latest = recentEntries[recentEntries.length - 1];
+  const hoursElapsed = (new Date(latest.timestamp) - new Date(oldest.timestamp)) / (1000 * 60 * 60);
+  const percentChange = latest.tokenQuotaPercent - oldest.tokenQuotaPercent;
+  const percentPerHour = percentChange / hoursElapsed;
+
+  if (percentPerHour <= 0) return null; // Not consuming quota
+
+  const remainingPercent = 100 - quotaPercent;
+  const hoursUntilExhausted = remainingPercent / percentPerHour;
+
+  return {
+    hoursUntilExhausted: Math.round(hoursUntilExhausted),
+    rate: percentPerHour.toFixed(2)
+  };
+}
+
 /**
  * Main collection function
  */
@@ -217,6 +249,15 @@ async function collectUsage() {
         percentage: timeQuota.percentage || 0
       }
     };
+
+    const prediction = calculateQuotaPrediction(entry.tokenQuotaPercent, history.entries);
+    if (prediction) {
+      console.log(`  ⏰ Quota will exhaust in ~${prediction.hoursUntilExhausted} hours at ${prediction.rate}%/hour`);
+      if (prediction.hoursUntilExhausted < 24) {
+        console.log(`⚠️  WARNING: Quota exhaustion imminent!`);
+      }
+      history.quotaPrediction = prediction;
+    }
 
     saveHistory(history);
 
