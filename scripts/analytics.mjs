@@ -4,9 +4,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { fileURLToPath } from 'url';
+
 const HISTORY_FILE = path.join(os.homedir(), '.glm-monitor', 'usage-history.json');
 
-function generateSummaryReport(entries, period) {
+export function generateSummaryReport(entries, period) {
     const latest = entries[entries.length - 1];
     const first = entries[0];
 
@@ -21,7 +23,7 @@ function generateSummaryReport(entries, period) {
     console.log(`Token Growth:       ${tokenGrowth.toFixed(1)}%`);
 }
 
-function generateRatesReport(entries) {
+export function generateRatesReport(entries) {
     const hourlyRates = [];
 
     for (let i = 1; i < entries.length; i++) {
@@ -57,7 +59,7 @@ function generateRatesReport(entries) {
     console.log(`Tokens/Hour: ${peak.tokensPerHour.toFixed(0)}`);
 }
 
-function generatePeakUsageReport(entries) {
+export function generatePeakUsageReport(entries) {
     const hourlyUsage = {};
 
     entries.forEach(entry => {
@@ -85,48 +87,57 @@ function generatePeakUsageReport(entries) {
     console.log(`   Avg Tokens/Entry: ${(peakHour[1].tokens / peakHour[1].count).toFixed(0)}`);
 }
 
-// Parse CLI args
-const args = process.argv.slice(2);
-const reportIndex = args.indexOf('--report');
-const reportType = reportIndex !== -1 ? args[reportIndex + 1] : 'summary';
-const periodIndex = args.indexOf('--period');
-const period = periodIndex !== -1 ? args[periodIndex + 1] : '24h';
+export function runCLI(args) {
+    const reportIndex = args.indexOf('--report');
+    const reportType = reportIndex !== -1 ? args[reportIndex + 1] : 'summary';
+    const periodIndex = args.indexOf('--period');
+    const period = periodIndex !== -1 ? args[periodIndex + 1] : '24h';
 
-// Load data
-if (!fs.existsSync(HISTORY_FILE)) {
-    console.error('No usage data found. Run glm-monitor collect first.');
-    process.exit(1);
+    run(reportType, period);
 }
 
-let data;
-try {
-    data = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
-} catch (e) {
-    console.error('Failed to parse history file.');
-    process.exit(1);
+function run(reportType, period) {
+    // Load data
+    if (!fs.existsSync(HISTORY_FILE)) {
+        console.error('No usage data found. Run glm-monitor collect first.');
+        process.exit(1);
+    }
+
+    let data;
+    try {
+        data = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
+    } catch (e) {
+        console.error('Failed to parse history file.');
+        process.exit(1);
+    }
+
+    const retentionMap = { '1h': 12, '6h': 72, '12h': 144, '24h': 288, '7d': 2016, '30d': 8640 };
+    // Default to 24h count if period invalid or not found
+    const entriesCount = retentionMap[period] || 288;
+    const filteredEntries = data.entries.slice(-entriesCount);
+
+    if (filteredEntries.length === 0) {
+        console.error('Not enough data for the specified period.');
+        process.exit(1);
+    }
+
+    // Run appropriate report
+    switch (reportType) {
+        case 'summary':
+            generateSummaryReport(filteredEntries, period);
+            break;
+        case 'rates':
+            generateRatesReport(filteredEntries);
+            break;
+        case 'peak':
+            generatePeakUsageReport(filteredEntries);
+            break;
+        default:
+            console.log('Unknown report type. Use: summary, rates, peak');
+    }
 }
 
-const retentionMap = { '1h': 12, '6h': 72, '12h': 144, '24h': 288, '7d': 2016, '30d': 8640 };
-// Default to 24h count if period invalid or not found
-const entriesCount = retentionMap[period] || 288;
-const filteredEntries = data.entries.slice(-entriesCount);
-
-if (filteredEntries.length === 0) {
-    console.error('Not enough data for the specified period.');
-    process.exit(1);
-}
-
-// Run appropriate report
-switch (reportType) {
-    case 'summary':
-        generateSummaryReport(filteredEntries, period);
-        break;
-    case 'rates':
-        generateRatesReport(filteredEntries);
-        break;
-    case 'peak':
-        generatePeakUsageReport(filteredEntries);
-        break;
-    default:
-        console.log('Unknown report type. Use: summary, rates, peak');
+// Only execute if running directly
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    runCLI(process.argv.slice(2));
 }

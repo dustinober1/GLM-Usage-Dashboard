@@ -21,8 +21,8 @@ try {
     packageJson = {};
 }
 
-const config = new Conf({ projectName: 'glm-monitor' });
-const program = new Command();
+export const config = new Conf({ projectName: 'glm-monitor' });
+export const program = new Command();
 
 program
     .name('glm-monitor')
@@ -173,6 +173,24 @@ program
         }
     });
 
+program
+    .command('test-alert')
+    .description('Test quota alert notifications')
+    .action(async () => {
+        try {
+            const notifier = (await import('node-notifier')).default;
+            notifier.notify({
+                title: 'GLM Monitor Alert',
+                message: '⚠️ Token quota at 85% - Approaching limit!',
+                sound: true,
+                wait: false
+            });
+            console.log('✓ Test notification sent');
+        } catch (err) {
+            console.error('Failed to send notification:', err.message);
+        }
+    });
+
 /**
  * START Command
  */
@@ -319,4 +337,7 @@ program
         program.parse(['node', 'bin/glm-monitor.js', 'start']);
     });
 
-program.parse();
+// Only parse if run directly
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    program.parse();
+}

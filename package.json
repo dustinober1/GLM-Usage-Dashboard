@@ -28,7 +28,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node bin/glm-monitor.js start",
-    "monitor": "node bin/glm-monitor.js monitor"
+    "monitor": "node bin/glm-monitor.js monitor",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "glm",
@@ -41,11 +43,15 @@
     "chart.js": "^4.5.1",
     "commander": "^14.0.2",
     "conf": "^15.0.2",
-    "opn": "^5.5.0"
+    "opn": "^5.5.0",
+    "node-notifier": "^10.0.1"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.17",
+    "jsdom": "^27.4.0",
     "puppeteer": "^24.34.0",
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vitest": "^4.0.17"
   },
   "engines": {
     "node": ">=18"

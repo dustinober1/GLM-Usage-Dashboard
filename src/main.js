@@ -28,7 +28,7 @@ const timeRanges = [
 /**
  * Format large numbers for display
  */
-function formatNumber(num) {
+export function formatNumber(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toLocaleString();
@@ -37,7 +37,7 @@ function formatNumber(num) {
 /**
  * Calculate Usage Rates
  */
-function calculateRates(entries) {
+export function calculateRates(entries) {
   if (entries.length < 2) return null;
 
   const latest = entries[entries.length - 1];
@@ -62,7 +62,7 @@ function calculateRates(entries) {
 /**
  * Render Rate Cards
  */
-function renderRateCards(rates) {
+export function renderRateCards(rates) {
   const container = document.getElementById('rates-grid');
   if (!container || !rates) return;
 
@@ -85,7 +85,7 @@ function renderRateCards(rates) {
 /**
  * Render Metric Card
  */
-function renderMetricCard(id, label, value, unit = '', trend = null) {
+export function renderMetricCard(id, label, value, unit = '', trend = null) {
   const container = document.getElementById(id);
   if (!container) return;
 
@@ -105,7 +105,7 @@ function renderMetricCard(id, label, value, unit = '', trend = null) {
 /**
  * Render Quota Card
  */
-function renderQuotaCard(id, title, limitObj, prediction = null) {
+export function renderQuotaCard(id, title, limitObj, prediction = null) {
   const container = document.getElementById(id);
   if (!container) return;
 
@@ -139,7 +139,7 @@ function renderQuotaCard(id, title, limitObj, prediction = null) {
 /**
  * Update Charts
  */
-function updateCharts(entries) {
+export function updateCharts(entries) {
   const tokenCtx = document.getElementById('tokenChart');
   const callsCtx = document.getElementById('callsChart');
   if (!tokenCtx || !callsCtx) return;
@@ -241,9 +241,9 @@ function updateRefreshButton(refreshing) {
 }
 
 /**
- * Main Load Function
+ * Fetch Data from API
  */
-async function fetchData(isManualRefresh = false) {
+export async function fetchData(isManualRefresh = false) {
   const startTime = Date.now();
 
   if (isManualRefresh) {
@@ -327,6 +327,7 @@ function render() {
               ${timeRanges.map(r => `<option value="${r.value}" ${r.value === state.timeRange ? 'selected' : ''}>${r.label}</option>`).join('')}
             </select>
           </div>
+          <button class="btn" id="settingsBtn" title="Settings">⚙️</button>
           <button class="btn btn-primary" id="refreshBtn" ${state.refreshing ? 'disabled' : ''}>
             ${state.refreshing ? 'Syncing...' : 'Sync Now'}
           </button>
@@ -367,6 +368,11 @@ function render() {
           </div>
         </div>
       </div>
+
+      <div class="tool-section">
+        <h3>MCP Tool Breakdown</h3>
+        <div id="tool-breakdown"></div>
+      </div>
     </div>
   `;
 
@@ -375,8 +381,10 @@ function render() {
   const exportBtn = document.getElementById('exportBtn');
   const timeRangeSelect = document.getElementById('timeRangeSelect');
 
+  const settingsBtn = document.getElementById('settingsBtn');
   if (refreshBtn) refreshBtn.onclick = () => fetchData(true);
   if (exportBtn) exportBtn.onclick = exportCSV;
+  if (settingsBtn) settingsBtn.onclick = openSettingsModal;
   if (timeRangeSelect) {
     timeRangeSelect.onchange = (e) => {
       state.timeRange = e.target.value;
@@ -396,7 +404,16 @@ function render() {
   renderQuotaCard('q-tokens', 'Neural Token Capacity', quotaLimits.tokenQuota, quotaPrediction);
   renderQuotaCard('q-time', 'Temporal Access Quota', quotaLimits.timeQuota);
 
+  // MCP Tool Breakdown
+  const latestEntry = entries[entries.length - 1];
+  renderToolBreakdown(latestEntry?.mcpToolBreakdown || null);
+
   updateCharts(entries);
+
+  // Check for quota alerts
+  if (quotaLimits?.tokenQuota) {
+    checkQuotaAlerts(quotaLimits.tokenQuota);
+  }
 }
 
 /**
@@ -419,6 +436,207 @@ function exportCSV() {
   link.click();
 }
 
+/**
+ * Settings Modal
+ */
+export function openSettingsModal() {
+  // Remove any existing modal
+  const existingModal = document.querySelector('.modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label>Alert Thresholds</label>
+          <div class="setting-row">
+            <label>Warning level:</label>
+            <select id="warningThreshold">
+              <option value="50">50%</option>
+              <option value="60">60%</option>
+              <option value="70">70%</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label>Critical level:</label>
+            <select id="criticalThreshold">
+              <option value="80">80%</option>
+              <option value="90">90%</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label>Refresh Interval</label>
+          <div class="setting-row">
+            <label>Auto-refresh every:</label>
+            <select id="refreshInterval">
+              <option value="15000">15 seconds</option>
+              <option value="30000">30 seconds</option>
+              <option value="60000">1 minute</option>
+              <option value="300000">5 minutes</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label>Notifications</label>
+          <div class="setting-row">
+            <label>Browser notifications:</label>
+            <select id="notificationsEnabled">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancelSettings">Cancel</button>
+        <button class="btn btn-primary" id="saveSettings">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Load current settings
+  document.getElementById('warningThreshold').value = localStorage.getItem('warningThreshold') || '50';
+  document.getElementById('criticalThreshold').value = localStorage.getItem('criticalThreshold') || '80';
+  document.getElementById('refreshInterval').value = localStorage.getItem('refreshInterval') || '30000';
+  document.getElementById('notificationsEnabled').value = localStorage.getItem('notificationsEnabled') || 'true';
+
+  // Event handlers
+  const closeModal = () => modal.remove();
+  modal.querySelector('.close-modal').onclick = closeModal;
+  document.getElementById('cancelSettings').onclick = closeModal;
+  modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+  document.getElementById('saveSettings').onclick = () => {
+    localStorage.setItem('warningThreshold', document.getElementById('warningThreshold').value);
+    localStorage.setItem('criticalThreshold', document.getElementById('criticalThreshold').value);
+    localStorage.setItem('refreshInterval', document.getElementById('refreshInterval').value);
+    localStorage.setItem('notificationsEnabled', document.getElementById('notificationsEnabled').value);
+    closeModal();
+    // Show confirmation toast
+    showToast('Settings saved successfully!', 'success');
+  };
+}
+
+/**
+ * Show Toast Notification
+ */
+export function showToast(message, type = 'info') {
+  const existingToast = document.querySelector('.notification-toast');
+  if (existingToast) existingToast.remove();
+
+  const toast = document.createElement('div');
+  toast.className = `notification-toast ${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => toast.remove(), 3000);
+}
+
+/**
+ * Check Quota Alerts and Send Notifications
+ */
+export function checkQuotaAlerts(quotaData) {
+  const notificationsEnabled = localStorage.getItem('notificationsEnabled') !== 'false';
+  if (!notificationsEnabled) return;
+
+  const warningThreshold = parseInt(localStorage.getItem('warningThreshold') || '50');
+  const criticalThreshold = parseInt(localStorage.getItem('criticalThreshold') || '80');
+  const lastAlertTime = parseInt(localStorage.getItem('lastAlertTime') || '0');
+  const alertCooldown = 60 * 60 * 1000; // 1 hour between alerts
+  const now = Date.now();
+
+  if (now - lastAlertTime < alertCooldown) return;
+
+  const percent = quotaData.percentage;
+
+  if (percent >= criticalThreshold) {
+    sendNotification('Critical Alert', `Token quota at ${percent}% - Approaching limit!`);
+    localStorage.setItem('lastAlertTime', now.toString());
+  } else if (percent >= warningThreshold) {
+    sendNotification('Warning', `Token quota at ${percent}% - Monitor usage`);
+    localStorage.setItem('lastAlertTime', now.toString());
+  }
+}
+
+/**
+ * Send Browser Notification
+ */
+export function sendNotification(title, message) {
+  if (!('Notification' in window)) return;
+
+  if (Notification.permission === 'granted') {
+    new Notification(`GLM ${title}`, { body: message });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        new Notification(`GLM ${title}`, { body: message });
+      }
+    });
+  }
+}
+
+/**
+ * Request Notification Permissions
+ */
+export function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+/**
+ * Render Tool Breakdown
+ */
+export function renderToolBreakdown(breakdown) {
+  const container = document.getElementById('tool-breakdown');
+  if (!container || !breakdown || Object.keys(breakdown).length === 0) {
+    if (container) {
+      container.innerHTML = `<div class="card"><p style="color: var(--text-dim); text-align: center; padding: 20px;">No MCP tool data available</p></div>`;
+    }
+    return;
+  }
+
+  const sortedTools = Object.entries(breakdown)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 10);
+
+  const total = sortedTools.reduce((sum, [, count]) => sum + count, 0);
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="quota-header">
+        <div class="quota-title">MCP Tool Usage</div>
+      </div>
+      <div class="tool-list">
+        ${sortedTools.map(([tool, count]) => `
+          <div class="tool-item">
+            <div class="tool-name">${tool}</div>
+            <div class="tool-count">${count} calls (${((count / total) * 100).toFixed(1)}%)</div>
+            <div class="tool-bar">
+              <div class="tool-bar-fill" style="width: ${(count / total * 100).toFixed(1)}%"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 // Initial Kickoff
-fetchData();
-setInterval(fetchData, REFRESH_INTERVAL);
+if (!import.meta.env.TEST) {
+  fetchData();
+  // Use configured refresh interval
+  const refreshInterval = parseInt(localStorage.getItem('refreshInterval') || '30000');
+  setInterval(fetchData, refreshInterval);
+  // Request notification permission on load
+  requestNotificationPermission();
+}

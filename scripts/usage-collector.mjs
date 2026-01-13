@@ -79,7 +79,7 @@ const quotaLimitUrl = `${baseDomain}/api/monitor/usage/quota/limit`;
 /**
  * Query the usage API
  */
-async function queryUsage(apiUrl, label) {
+export async function queryUsage(apiUrl, label) {
   return new Promise((resolve, reject) => {
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, now.getHours(), 0, 0, 0);
@@ -159,7 +159,7 @@ function saveHistory(history) {
   }
 }
 
-function calculateQuotaPrediction(quotaPercent, usageHistory) {
+export function calculateQuotaPrediction(quotaPercent, usageHistory) {
   // Use last 6 hours for rate calculation
   const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
   const recentEntries = usageHistory.filter(e => new Date(e.timestamp) >= sixHoursAgo);
@@ -186,7 +186,7 @@ function calculateQuotaPrediction(quotaPercent, usageHistory) {
 /**
  * Main collection function
  */
-async function collectUsage() {
+export async function collectUsage() {
   console.log(`[${new Date().toISOString()}] Collecting usage data...`);
 
   try {
@@ -216,7 +216,8 @@ async function collectUsage() {
       tokensUsed: modelTotal.totalTokensUsage || 0,
       mcpCalls: toolTotal.totalSearchMcpCount || 0,
       tokenQuotaPercent: tokenQuota.percentage || 0,
-      timeQuotaPercent: timeQuota.percentage || 0
+      timeQuotaPercent: timeQuota.percentage || 0,
+      mcpToolBreakdown: toolTotal.toolBreakdown || {}
     };
 
     // Load and update history
@@ -283,4 +284,6 @@ async function collectUsage() {
 }
 
 // Run collector
-collectUsage();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  collectUsage();
+}
