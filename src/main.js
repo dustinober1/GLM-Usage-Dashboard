@@ -26,6 +26,154 @@ const timeRanges = [
 ];
 
 /**
+ * Theme Management
+ */
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const newTheme = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+
+  const themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) {
+    themeBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+  }
+}
+
+/**
+ * Close any open modal
+ */
+function closeModal() {
+  const modal = document.querySelector('.modal');
+  if (modal) modal.remove();
+}
+
+/**
+ * Show Help Modal with Keyboard Shortcuts
+ */
+function showHelpModal() {
+  closeModal();
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Keyboard Shortcuts</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcut-list">
+          <div class="shortcut-item"><kbd>R</kbd> <span>Refresh data</span></div>
+          <div class="shortcut-item"><kbd>E</kbd> <span>Export CSV</span></div>
+          <div class="shortcut-item"><kbd>S</kbd> <span>Settings</span></div>
+          <div class="shortcut-item"><kbd>T</kbd> <span>Toggle theme</span></div>
+          <div class="shortcut-item"><kbd>H</kbd> or <kbd>?</kbd> <span>Show help</span></div>
+          <div class="shortcut-item"><kbd>Esc</kbd> <span>Close modal</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.querySelector('.close-modal').onclick = () => modal.remove();
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+/**
+ * Initialize Keyboard Shortcuts
+ */
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Don't trigger if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+      return;
+    }
+
+    switch (e.key.toLowerCase()) {
+      case 'r':
+        e.preventDefault();
+        fetchData(true);
+        showToast('Refreshing data...', 'info');
+        break;
+      case 'e':
+        e.preventDefault();
+        if (state.data) {
+          exportCSV();
+          showToast('Data exported', 'success');
+        }
+        break;
+      case 's':
+        e.preventDefault();
+        openSettingsModal();
+        break;
+      case 't':
+        e.preventDefault();
+        toggleTheme();
+        break;
+      case 'h':
+        e.preventDefault();
+        showHelpModal();
+        break;
+      case '?':
+        e.preventDefault();
+        showHelpModal();
+        break;
+      case 'escape':
+        closeModal();
+        break;
+    }
+  });
+}
+
+/**
+ * Render Skeleton Loading Screen
+ */
+function renderSkeleton() {
+  return `
+    <div class="app-container">
+      <div class="header-skeleton">
+        <div class="skeleton skeleton-text" style="width: 200px; height: 32px;"></div>
+        <div class="skeleton skeleton-text" style="width: 150px;"></div>
+      </div>
+      
+      <div class="metrics-grid">
+        ${[1, 2, 3].map(() => `
+          <div class="card">
+            <div class="skeleton skeleton-text" style="width: 100px; margin-bottom: 16px;"></div>
+            <div class="skeleton skeleton-metric"></div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="quota-section">
+        ${[1, 2].map(() => `
+          <div class="card">
+            <div class="skeleton skeleton-text" style="width: 150px; margin-bottom: 20px;"></div>
+            <div class="skeleton" style="height: 12px; margin-bottom: 16px;"></div>
+            <div class="skeleton skeleton-text" style="width: 50%;"></div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="charts-row">
+        ${[1, 2].map(() => `
+          <div class="card">
+            <div class="skeleton skeleton-text" style="width: 150px; margin-bottom: 20px;"></div>
+            <div class="skeleton skeleton-chart"></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Format large numbers for display
  */
 export function formatNumber(num) {
@@ -285,8 +433,10 @@ export async function fetchData(isManualRefresh = false) {
  */
 function render() {
   const root = document.getElementById('app');
-  if (state.loading) {
-    root.innerHTML = '<div class="loading">Initializing Dashboard...</div>';
+
+  // Show skeleton during initial load
+  if (state.loading && !state.data) {
+    root.innerHTML = renderSkeleton();
     return;
   }
 
@@ -335,6 +485,8 @@ function render() {
             </select>
           </div>
           <button class="btn" id="settingsBtn" title="Settings">⚙️</button>
+          <button class="btn theme-toggle" id="themeToggle" title="Toggle theme">${(localStorage.getItem('theme') || 'dark') === 'dark' ? '☀️' : '🌙'}</button>
+          <button class="btn" id="helpBtn" title="Keyboard shortcuts">?</button>
           <button class="btn btn-primary" id="refreshBtn" ${state.refreshing ? 'disabled' : ''}>
             ${state.refreshing ? 'Syncing...' : 'Sync Now'}
           </button>
@@ -399,6 +551,12 @@ function render() {
       render();
     };
   }
+
+  // Theme and help buttons
+  const themeToggleBtn = document.getElementById('themeToggle');
+  const helpBtn = document.getElementById('helpBtn');
+  if (themeToggleBtn) themeToggleBtn.onclick = toggleTheme;
+  if (helpBtn) helpBtn.onclick = showHelpModal;
 
   // Render sub-components
   renderMetricCard('m-tokens', 'Compute Tokens', formatNumber(latest.tokensUsed), 'tokens', tokenTrend);
@@ -640,6 +798,10 @@ export function renderToolBreakdown(breakdown) {
 
 // Initial Kickoff
 if (!import.meta.env.TEST) {
+  // Initialize theme and keyboard shortcuts
+  initTheme();
+  initKeyboardShortcuts();
+
   fetchData();
   // Use configured refresh interval
   const refreshInterval = parseInt(localStorage.getItem('refreshInterval') || '30000');

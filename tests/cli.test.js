@@ -228,4 +228,12 @@ describe('CLI Commands', () => {
 
         expect(execSync).toHaveBeenCalledWith(expect.stringContaining('analytics.mjs --report insights --period 24h'), expect.anything());
     });
+
+    // Phase 6: Polish & UX Refinements Tests
+
+    it('should define setup command', () => {
+        const cmd = program.commands.find(c => c.name() === 'setup');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Interactive setup wizard');
+    });
 });

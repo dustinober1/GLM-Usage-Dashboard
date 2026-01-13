@@ -803,6 +803,21 @@ program
     });
 
 /**
+ * SETUP Command - Interactive setup wizard
+ */
+program
+    .command('setup')
+    .description('Interactive setup wizard for first-time configuration')
+    .action(() => {
+        const wizardPath = path.join(packageRoot, 'scripts/setup-wizard.mjs');
+        try {
+            execSync(`node ${wizardPath}`, { stdio: 'inherit' });
+        } catch (e) {
+            // Script handles its own errors
+        }
+    });
+
+/**
  * MONITOR Command (Collect then Start)
  */
 program
