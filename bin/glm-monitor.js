@@ -644,11 +644,46 @@ program
     });
 
 /**
+ * API Command - Start REST API server for integrations
+ */
+program
+    .command('api')
+    .description('Start REST API server for local integrations')
+    .option('-p, --port <port>', 'Port to listen on', '8081')
+    .action((options) => {
+        const port = parseInt(options.port, 10);
+        if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+            console.error(`Invalid port: ${options.port}`);
+            return;
+        }
+
+        console.log('\n🔌 Starting GLM Monitor API server...');
+
+        const apiPath = path.join(packageRoot, 'scripts/api-server.mjs');
+        const apiServer = spawn('node', [apiPath], {
+            env: { ...process.env, PORT: port.toString() },
+            stdio: 'inherit'
+        });
+
+        apiServer.on('error', (err) => {
+            console.error('Failed to start API server:', err.message);
+        });
+
+        // Graceful shutdown
+        process.on('SIGINT', () => {
+            console.log('\n\nShutting down API server...');
+            apiServer.kill();
+            process.exit(0);
+        });
+    });
+
+/**
  * MONITOR Command (Collect then Start)
  */
 program
     .command('monitor')
     .description('Collect data and then launch dashboard')
+
     .action(async () => {
         try {
             const collectorPath = path.join(packageRoot, 'scripts/usage-collector.mjs');

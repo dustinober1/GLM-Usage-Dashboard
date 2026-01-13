@@ -43,8 +43,9 @@
     "chart.js": "^4.5.1",
     "commander": "^14.0.2",
     "conf": "^15.0.2",
-    "opn": "^5.5.0",
-    "node-notifier": "^10.0.1"
+    "express": "^4.22.1",
+    "node-notifier": "^10.0.1",
+    "opn": "^5.5.0"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.17",

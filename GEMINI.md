@@ -1,7 +1,17 @@
 # Session Log
 
 ## 2026-01-12
+- Implemented Phase 4: REST API for Local Integrations
+    - Created `scripts/api-server.mjs` Express REST API server (localhost-only)
+    - Added endpoints: `/api/health`, `/api/current`, `/api/history`, `/api/predict`, `/api/rates`, `/api/settings`
+    - Added `api` CLI command with port configuration (`glm-monitor api -p 8081`)
+    - Added `express@^4.18.2` dependency
+    - Created `docs/api-examples.md` with comprehensive integration examples (curl, Python, Node.js, automation)
+    - Added `tests/api-server.test.js` with 8 unit tests for API endpoints
+    - All 43 tests passing
+
 - Implemented Phase 3: Data Management & Multi-Profile
+
     - Created `scripts/data-manager.mjs` for extended data retention with hourly summarization
     - Added `cleanup` CLI command for archiving and data cleanup
     - Added `backup` CLI command for data export to JSON files
