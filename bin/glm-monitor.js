@@ -192,6 +192,328 @@ program
     });
 
 /**
+ * CLEANUP Command - Archive and clean up old data
+ */
+program
+    .command('cleanup')
+    .description('Archive and clean up old data')
+    .option('--stats', 'Show storage statistics only')
+    .action(async (options) => {
+        try {
+            const dataManagerPath = path.join(packageRoot, 'scripts/data-manager.mjs');
+            if (options.stats) {
+                const { getStorageStats } = await import(dataManagerPath);
+                const stats = getStorageStats();
+                console.log('\n📊 Storage Statistics:');
+                console.log(`   Raw entries: ${stats.historyFile.entries}`);
+                console.log(`   Hourly summaries: ${stats.summaryFile.entries}`);
+                console.log(`   Total size: ${(stats.totalSize / 1024).toFixed(1)} KB\n`);
+            } else {
+                execSync(`node ${dataManagerPath}`, { stdio: 'inherit' });
+            }
+        } catch (err) {
+            console.error('Cleanup failed:', err.message);
+        }
+    });
+
+/**
+ * BACKUP Command - Backup usage data
+ */
+program
+    .command('backup')
+    .description('Backup usage data')
+    .option('--to <path>', 'Backup directory path')
+    .action((options) => {
+        const activeProfile = config.get('activeProfile', 'default');
+        const dataDir = path.join(os.homedir(), '.glm-monitor');
+        const backupPath = options.to || path.join(os.homedir(), 'glm-monitor-backups');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const backupFile = path.join(backupPath, `backup-${activeProfile}-${timestamp}.json`);
+
+        // Create backup directory
+        fs.mkdirSync(backupPath, { recursive: true });
+
+        // Determine history file path based on profile
+        const historyFileName = activeProfile === 'default'
+            ? 'usage-history.json'
+            : `${activeProfile}-usage-history.json`;
+        const summaryFileName = activeProfile === 'default'
+            ? 'usage-summary.json'
+            : `${activeProfile}-usage-summary.json`;
+
+        const historyPath = path.join(dataDir, historyFileName);
+        const summaryPath = path.join(dataDir, summaryFileName);
+
+        if (!fs.existsSync(historyPath)) {
+            console.error('No usage data found. Run collect first.');
+            return;
+        }
+
+        const historyData = JSON.parse(fs.readFileSync(historyPath, 'utf-8'));
+        const summaryData = fs.existsSync(summaryPath)
+            ? JSON.parse(fs.readFileSync(summaryPath, 'utf-8'))
+            : { summaries: [] };
+
+        const backup = {
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            profile: activeProfile,
+            config: {
+                retention: config.get('retention', '24h'),
+                baseUrl: config.get('baseUrl', 'https://api.z.ai/api/anthropic')
+            },
+            history: historyData,
+            summaries: summaryData
+        };
+
+        fs.writeFileSync(backupFile, JSON.stringify(backup, null, 2));
+        const fileSize = fs.statSync(backupFile).size;
+
+        console.log(`\n✓ Backup created successfully`);
+        console.log(`  Profile: ${activeProfile}`);
+        console.log(`  File: ${backupFile}`);
+        console.log(`  Size: ${(fileSize / 1024).toFixed(1)} KB`);
+        console.log(`  History entries: ${historyData.entries?.length || 0}`);
+        console.log(`  Summary entries: ${summaryData.summaries?.length || 0}\n`);
+    });
+
+/**
+ * RESTORE Command - Restore usage data from backup
+ */
+program
+    .command('restore')
+    .description('Restore usage data from backup')
+    .option('--from <path>', 'Backup file path')
+    .option('--force', 'Skip confirmation prompt')
+    .action(async (options) => {
+        const backupPath = options.from;
+
+        if (!backupPath || !fs.existsSync(backupPath)) {
+            // List available backups
+            const defaultBackupDir = path.join(os.homedir(), 'glm-monitor-backups');
+            if (fs.existsSync(defaultBackupDir)) {
+                const backups = fs.readdirSync(defaultBackupDir)
+                    .filter(f => f.startsWith('backup-') && f.endsWith('.json'))
+                    .sort()
+                    .reverse()
+                    .slice(0, 10);
+
+                if (backups.length > 0) {
+                    console.log('\nAvailable backups:');
+                    backups.forEach(b => console.log(`  ${path.join(defaultBackupDir, b)}`));
+                    console.log('\nUse: glm-monitor restore --from <path>\n');
+                    return;
+                }
+            }
+            console.error('Backup file not found. Specify with --from <path>');
+            return;
+        }
+
+        let backup;
+        try {
+            backup = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
+        } catch (e) {
+            console.error('Failed to parse backup file:', e.message);
+            return;
+        }
+
+        console.log(`\n📦 Backup Information:`);
+        console.log(`   Created: ${new Date(backup.timestamp).toLocaleString()}`);
+        console.log(`   Profile: ${backup.profile || 'default'}`);
+        console.log(`   History entries: ${backup.history?.entries?.length || 0}`);
+        console.log(`   Summary entries: ${backup.summaries?.summaries?.length || 0}`);
+
+        if (!options.force) {
+            const readline = (await import('readline')).default.createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+
+            const answer = await new Promise(resolve => {
+                readline.question('\nRestore this backup? This will overwrite current data. [y/N]: ', resolve);
+            });
+            readline.close();
+
+            if (answer.toLowerCase() !== 'y') {
+                console.log('Restore cancelled.\n');
+                return;
+            }
+        }
+
+        const dataDir = path.join(os.homedir(), '.glm-monitor');
+        fs.mkdirSync(dataDir, { recursive: true });
+
+        const profile = backup.profile || 'default';
+        const historyFileName = profile === 'default'
+            ? 'usage-history.json'
+            : `${profile}-usage-history.json`;
+        const summaryFileName = profile === 'default'
+            ? 'usage-summary.json'
+            : `${profile}-usage-summary.json`;
+
+        fs.writeFileSync(
+            path.join(dataDir, historyFileName),
+            JSON.stringify(backup.history, null, 2)
+        );
+
+        if (backup.summaries && backup.summaries.summaries) {
+            fs.writeFileSync(
+                path.join(dataDir, summaryFileName),
+                JSON.stringify(backup.summaries, null, 2)
+            );
+        }
+
+        console.log(`\n✓ Restored from: ${backupPath}`);
+        console.log(`  Profile: ${profile}`);
+        console.log(`  History entries: ${backup.history?.entries?.length || 0}`);
+        console.log(`  Summary entries: ${backup.summaries?.summaries?.length || 0}\n`);
+    });
+
+/**
+ * PROFILE Command - Manage multiple GLM account profiles
+ */
+program
+    .command('profile')
+    .description('Manage multiple GLM account profiles')
+    .option('--create <name>', 'Create a new profile')
+    .option('--switch <name>', 'Switch to a profile')
+    .option('--list', 'List all profiles')
+    .option('--delete <name>', 'Delete a profile')
+    .option('--token <token>', 'Auth token for new profile (use with --create)')
+    .action(async (options) => {
+        if (options.list || (!options.create && !options.switch && !options.delete)) {
+            const profiles = config.get('profiles', {});
+            const active = config.get('activeProfile', 'default');
+
+            console.log('\n📋 Profiles:');
+
+            // Always show default profile
+            const defaultMarker = active === 'default' || !active ? '✓ ' : '  ';
+            const defaultToken = config.get('authToken');
+            console.log(`${defaultMarker}default ${defaultToken ? '(token set)' : '(no token)'}`);
+
+            Object.entries(profiles).forEach(([name, profile]) => {
+                const marker = name === active ? '✓ ' : '  ';
+                const created = profile.createdAt
+                    ? ` (created: ${new Date(profile.createdAt).toLocaleDateString()})`
+                    : '';
+                console.log(`${marker}${name}${created}`);
+            });
+
+            console.log(`\nActive profile: ${active || 'default'}\n`);
+            return;
+        }
+
+        if (options.create) {
+            const profileName = options.create;
+            const profiles = config.get('profiles', {});
+
+            if (profileName === 'default') {
+                console.error('Cannot create a profile named "default". Use glm-monitor init instead.');
+                return;
+            }
+
+            if (profiles[profileName]) {
+                console.error(`Profile "${profileName}" already exists.`);
+                return;
+            }
+
+            let token = options.token;
+
+            if (!token) {
+                const readline = (await import('readline')).default.createInterface({
+                    input: process.stdin,
+                    output: process.stdout
+                });
+
+                token = await new Promise(resolve => {
+                    readline.question(`Enter GLM auth token for "${profileName}": `, resolve);
+                });
+                readline.close();
+            }
+
+            if (!token || token.trim() === '') {
+                console.error('Auth token is required.');
+                return;
+            }
+
+            profiles[profileName] = {
+                authToken: token.trim(),
+                baseUrl: config.get('baseUrl', 'https://api.z.ai/api/anthropic'),
+                createdAt: new Date().toISOString()
+            };
+
+            config.set('profiles', profiles);
+            console.log(`✓ Profile "${profileName}" created`);
+
+            // Offer to switch if this is the first custom profile
+            if (Object.keys(profiles).length === 1) {
+                config.set('activeProfile', profileName);
+                console.log(`✓ Switched to profile "${profileName}"`);
+            }
+            return;
+        }
+
+        if (options.switch) {
+            const profileName = options.switch;
+            const profiles = config.get('profiles', {});
+
+            if (profileName !== 'default' && !profiles[profileName]) {
+                console.error(`Profile "${profileName}" not found.`);
+                const available = ['default', ...Object.keys(profiles)];
+                console.log(`Available profiles: ${available.join(', ')}`);
+                return;
+            }
+
+            config.set('activeProfile', profileName);
+            console.log(`✓ Switched to profile "${profileName}"`);
+            return;
+        }
+
+        if (options.delete) {
+            const profileName = options.delete;
+            const profiles = config.get('profiles', {});
+
+            if (profileName === 'default') {
+                console.error('Cannot delete the default profile.');
+                return;
+            }
+
+            if (!profiles[profileName]) {
+                console.error(`Profile "${profileName}" not found.`);
+                return;
+            }
+
+            if (profileName === config.get('activeProfile')) {
+                console.error('Cannot delete the active profile. Switch to another profile first.');
+                console.log('Use: glm-monitor profile --switch default');
+                return;
+            }
+
+            delete profiles[profileName];
+            config.set('profiles', profiles);
+
+            // Also delete profile-specific data files
+            const dataDir = path.join(os.homedir(), '.glm-monitor');
+            const filesToDelete = [
+                `${profileName}-usage-history.json`,
+                `${profileName}-usage-summary.json`
+            ];
+
+            filesToDelete.forEach(f => {
+                const filePath = path.join(dataDir, f);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    console.log(`  Deleted: ${f}`);
+                }
+            });
+
+            console.log(`✓ Deleted profile "${profileName}"`);
+            return;
+        }
+    });
+
+/**
  * START Command
  */
 program

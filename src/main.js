@@ -311,13 +311,20 @@ function render() {
   const signalDate = new Date(lastUpdated);
   const isStale = (Date.now() - signalDate.getTime()) > 600000; // 10 minutes
 
+  // Get current profile from localStorage (set by CLI when collecting data)
+  const currentProfile = localStorage.getItem('currentProfile') || 'default';
+  const showProfileBadge = currentProfile !== 'default';
+
   root.innerHTML = `
     <div class="app-container">
       <header>
         <div class="title-section">
           <h1>GLM Intelligence</h1>
-          <div class="last-updated" style="color: ${isStale ? 'var(--danger)' : 'var(--text-dim)'}">
-            ${isStale ? '⚠️ ' : ''}Last signal: ${signalDate.toLocaleString()}
+          <div class="header-subtitle">
+            ${showProfileBadge ? `<span class="profile-indicator">👤 ${currentProfile}</span>` : ''}
+            <div class="last-updated" style="color: ${isStale ? 'var(--danger)' : 'var(--text-dim)'}">
+              ${isStale ? '⚠️ ' : ''}Last signal: ${signalDate.toLocaleString()}
+            </div>
           </div>
         </div>
         <div class="header-actions">

@@ -76,6 +76,25 @@ header {
     font-family: 'JetBrains Mono', monospace;
 }
 
+.header-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.profile-indicator {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .header-actions {
     display: flex;
     gap: 12px;

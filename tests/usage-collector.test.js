@@ -9,11 +9,13 @@ vi.mock('fs');
 vi.mock('conf', () => {
     return {
         default: class {
-            get(key) {
+            get(key, defaultValue) {
                 if (key === 'baseUrl') return 'https://api.example.com';
                 if (key === 'authToken') return 'fake-token';
                 if (key === 'retention') return '24h';
-                return null;
+                if (key === 'activeProfile') return defaultValue || 'default';
+                if (key === 'profiles') return defaultValue || {};
+                return defaultValue !== undefined ? defaultValue : null;
             }
         }
     };

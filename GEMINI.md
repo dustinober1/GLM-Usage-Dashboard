@@ -1,6 +1,16 @@
 # Session Log
 
 ## 2026-01-12
+- Implemented Phase 3: Data Management & Multi-Profile
+    - Created `scripts/data-manager.mjs` for extended data retention with hourly summarization
+    - Added `cleanup` CLI command for archiving and data cleanup
+    - Added `backup` CLI command for data export to JSON files
+    - Added `restore` CLI command for restoring from backup files
+    - Added `profile` CLI command for multi-account management (create, switch, list, delete)
+    - Updated `scripts/usage-collector.mjs` for profile-specific data paths
+    - Added profile indicator to dashboard UI showing active profile
+    - Added CSS styling for profile indicator badge
+
 - Implemented Phase 2: User Experience Enhancements
     - Added In-Dashboard Settings Modal (thresholds, refresh interval, notifications)
     - Added Desktop Notifications (browser Notification API with cooldown)

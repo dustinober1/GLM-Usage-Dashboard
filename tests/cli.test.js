@@ -19,7 +19,9 @@ vi.mock('conf', () => {
             constructor() {
                 this.store = {};
             }
-            get(key) { return this.store[key]; }
+            get(key, defaultValue) {
+                return this.store[key] !== undefined ? this.store[key] : defaultValue;
+            }
             set(key, val) { this.store[key] = val; }
         }
     };
@@ -139,5 +141,51 @@ describe('CLI Commands', () => {
         expect(execSync).toHaveBeenCalledWith(expect.stringContaining('usage-collector.mjs'), expect.anything());
         // And it should trigger start command logic which logs launching
         expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Launching GLM Neural Dashboard'));
+    });
+
+    // Phase 3: Data Management & Multi-Profile Tests
+
+    it('should define cleanup command', () => {
+        const cmd = program.commands.find(c => c.name() === 'cleanup');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Archive and clean up old data');
+    });
+
+    it('should define backup command', () => {
+        const cmd = program.commands.find(c => c.name() === 'backup');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Backup usage data');
+    });
+
+    it('should define restore command', () => {
+        const cmd = program.commands.find(c => c.name() === 'restore');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Restore usage data from backup');
+    });
+
+    it('should define profile command', () => {
+        const cmd = program.commands.find(c => c.name() === 'profile');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Manage multiple GLM account profiles');
+    });
+
+    it('should run profile --list command', async () => {
+        program.exitOverride();
+        try {
+            await program.parseAsync(['node', 'glm-monitor', 'profile', '--list']);
+        } catch (e) { }
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Profiles'));
+    });
+
+    it('should run backup command and handle missing data', () => {
+        program.exitOverride();
+        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+        try {
+            program.parse(['node', 'glm-monitor', 'backup']);
+        } catch (e) { }
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('No usage data found'));
     });
 });

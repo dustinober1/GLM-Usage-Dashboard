@@ -23,7 +23,44 @@ import Conf from 'conf';
 
 const config = new Conf({ projectName: 'glm-monitor' });
 const DATA_DIR = path.join(os.homedir(), '.glm-monitor');
-const HISTORY_FILE = path.join(DATA_DIR, 'usage-history.json');
+
+/**
+ * Get profile-specific data file path
+ */
+function getProfileDataPath(filename = 'usage-history.json') {
+  const activeProfile = config.get('activeProfile', 'default');
+  if (activeProfile === 'default') {
+    return path.join(DATA_DIR, filename);
+  }
+  const baseName = filename.replace('.json', '');
+  return path.join(DATA_DIR, `${activeProfile}-${baseName}.json`);
+}
+
+/**
+ * Get auth token for active profile
+ */
+function getActiveAuthToken() {
+  const activeProfile = config.get('activeProfile', 'default');
+  if (activeProfile === 'default') {
+    return config.get('authToken');
+  }
+  const profiles = config.get('profiles', {});
+  return profiles[activeProfile]?.authToken;
+}
+
+/**
+ * Get base URL for active profile
+ */
+function getActiveBaseUrl() {
+  const activeProfile = config.get('activeProfile', 'default');
+  if (activeProfile === 'default') {
+    return config.get('baseUrl') || process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/anthropic';
+  }
+  const profiles = config.get('profiles', {});
+  return profiles[activeProfile]?.baseUrl || config.get('baseUrl') || 'https://api.z.ai/api/anthropic';
+}
+
+const HISTORY_FILE = getProfileDataPath('usage-history.json');
 
 // Calculate max entries based on config
 const retentionPeriod = config.get('retention', '24h');
@@ -57,15 +94,26 @@ try {
   // Ignore symlink errors (e.g., on Windows without admin permissions)
 }
 
-// Read configuration
-const baseUrl = config.get('baseUrl') || process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/anthropic';
-const authToken = config.get('authToken') || process.env.ANTHROPIC_AUTH_TOKEN;
+// Read configuration (profile-aware)
+const activeProfile = config.get('activeProfile', 'default');
+const baseUrl = getActiveBaseUrl();
+const authToken = getActiveAuthToken() || process.env.ANTHROPIC_AUTH_TOKEN;
 
 // Validation
 if (!authToken) {
   console.error('\x1b[31mError: GLM Auth Token not configured.\x1b[0m');
-  console.error('\x1b[33mRun `glm-monitor init` to set up your credentials.\x1b[0m');
+  if (activeProfile !== 'default') {
+    console.error(`\x1b[33mActive profile: ${activeProfile}\x1b[0m`);
+    console.error('\x1b[33mRun `glm-monitor profile --create <name> --token <token>` or switch profiles.\x1b[0m');
+  } else {
+    console.error('\x1b[33mRun `glm-monitor init` to set up your credentials.\x1b[0m');
+  }
   process.exit(1);
+}
+
+// Log active profile if not default
+if (activeProfile !== 'default') {
+  console.log(`\x1b[36m[Profile: ${activeProfile}]\x1b[0m`);
 }
 
 // Determine platform and API URLs
