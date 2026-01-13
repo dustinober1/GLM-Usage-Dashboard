@@ -678,6 +678,131 @@ program
     });
 
 /**
+ * HEALTH-CHECK Command - Run system health diagnostics
+ */
+program
+    .command('health-check')
+    .description('Run system health diagnostics')
+    .action(async () => {
+        console.log('\n🏥 GLM Monitor Health Check\n');
+
+        let allPassed = true;
+
+        // Check 1: Configuration
+        console.log('Checking configuration...');
+        const hasAuthToken = config.get('authToken') || process.env.ANTHROPIC_AUTH_TOKEN;
+
+        if (hasAuthToken) {
+            console.log('  ✓ Auth token configured');
+        } else {
+            console.log('  ✗ No auth token found - Run: glm-monitor init');
+            allPassed = false;
+        }
+
+        // Check 2: Data file
+        console.log('\nChecking data files...');
+        const dataDir = path.join(os.homedir(), '.glm-monitor');
+        const activeProfile = config.get('activeProfile', 'default');
+        const historyFileName = activeProfile === 'default'
+            ? 'usage-history.json'
+            : `${activeProfile}-usage-history.json`;
+        const historyFile = path.join(dataDir, historyFileName);
+
+        if (fs.existsSync(historyFile)) {
+            const stats = fs.statSync(historyFile);
+            console.log(`  ✓ History file exists (${stats.size} bytes)`);
+
+            try {
+                const data = JSON.parse(fs.readFileSync(historyFile, 'utf-8'));
+                console.log(`  ✓ ${data.entries?.length || 0} entries`);
+
+                // Check for stale data
+                if (data.lastUpdated) {
+                    const lastUpdated = new Date(data.lastUpdated);
+                    const staleMinutes = (Date.now() - lastUpdated.getTime()) / (1000 * 60);
+                    if (staleMinutes > 30) {
+                        console.log(`  ⚠️  Data is ${Math.round(staleMinutes)} minutes old`);
+                    } else {
+                        console.log(`  ✓ Data is recent (${Math.round(staleMinutes)} minutes old)`);
+                    }
+                }
+            } catch (e) {
+                console.log('  ✗ Failed to parse history file');
+                allPassed = false;
+            }
+        } else {
+            console.log('  ✗ No history file - Run: glm-monitor collect');
+            allPassed = false;
+        }
+
+        // Check 3: API credentials
+        console.log('\nChecking GLM API configuration...');
+        const baseUrl = config.get('baseUrl') || process.env.ANTHROPIC_BASE_URL;
+        const authToken = config.get('authToken') || process.env.ANTHROPIC_AUTH_TOKEN;
+
+        if (baseUrl && authToken) {
+            console.log('  ✓ API credentials configured');
+            console.log(`     URL: ${baseUrl}`);
+        } else {
+            if (!baseUrl) console.log('  ✗ Base URL not set');
+            if (!authToken) console.log('  ✗ Auth token not set');
+            allPassed = false;
+        }
+
+        // Check 4: Data directory
+        console.log('\nChecking data directory...');
+        if (fs.existsSync(dataDir)) {
+            console.log(`  ✓ Data directory accessible: ${dataDir}`);
+        } else {
+            console.log('  ✗ Data directory not accessible');
+            allPassed = false;
+        }
+
+        // Summary
+        console.log('\n' + '='.repeat(50));
+        if (allPassed) {
+            console.log('✓ All checks passed!');
+        } else {
+            console.log('✗ Some checks failed - See above for details');
+            console.log('  Run: glm-monitor diagnose for detailed diagnostics');
+        }
+        console.log('='.repeat(50) + '\n');
+    });
+
+/**
+ * DIAGNOSE Command - Run diagnostics and report issues
+ */
+program
+    .command('diagnose')
+    .description('Run diagnostics and report issues')
+    .action(() => {
+        const diagnosticsPath = path.join(packageRoot, 'scripts/diagnostics.mjs');
+        try {
+            execSync(`node ${diagnosticsPath}`, { stdio: 'inherit' });
+        } catch (e) {
+            // Script handles its own error output
+        }
+    });
+
+/**
+ * INSIGHTS Command - Generate usage insights and patterns
+ */
+program
+    .command('insights')
+    .description('Generate usage insights and patterns')
+    .option('--period <range>', 'Time range: 1h, 6h, 12h, 24h, 7d, 30d', '24h')
+    .action((options) => {
+        const analyticsPath = path.join(packageRoot, 'scripts/analytics.mjs');
+        try {
+            execSync(`node ${analyticsPath} --report insights --period ${options.period}`, {
+                stdio: 'inherit'
+            });
+        } catch (e) {
+            // Script handles its own error output
+        }
+    });
+
+/**
  * MONITOR Command (Collect then Start)
  */
 program

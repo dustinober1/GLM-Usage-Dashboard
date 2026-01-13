@@ -188,4 +188,44 @@ describe('CLI Commands', () => {
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('No usage data found'));
     });
+
+    // Phase 5: Diagnostics & Debugging Tests
+
+    it('should define health-check command', () => {
+        const cmd = program.commands.find(c => c.name() === 'health-check');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Run system health diagnostics');
+    });
+
+    it('should define diagnose command', () => {
+        const cmd = program.commands.find(c => c.name() === 'diagnose');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Run diagnostics and report issues');
+    });
+
+    it('should define insights command', () => {
+        const cmd = program.commands.find(c => c.name() === 'insights');
+        expect(cmd).toBeDefined();
+        expect(cmd.description()).toContain('Generate usage insights and patterns');
+    });
+
+    it('should run health-check command with no data', async () => {
+        program.exitOverride();
+        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+        try {
+            await program.parseAsync(['node', 'glm-monitor', 'health-check']);
+        } catch (e) { }
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('GLM Monitor Health Check'));
+    });
+
+    it('should run insights command', () => {
+        program.exitOverride();
+        try {
+            program.parse(['node', 'glm-monitor', 'insights', '--period', '24h']);
+        } catch (e) { }
+
+        expect(execSync).toHaveBeenCalledWith(expect.stringContaining('analytics.mjs --report insights --period 24h'), expect.anything());
+    });
 });

@@ -87,6 +87,82 @@ export function generatePeakUsageReport(entries) {
     console.log(`   Avg Tokens/Entry: ${(peakHour[1].tokens / peakHour[1].count).toFixed(0)}`);
 }
 
+export function generateInsights(entries) {
+    console.log('\n💡 Usage Insights\n');
+
+    if (entries.length < 2) {
+        console.log('Insufficient data for insights.');
+        return;
+    }
+
+    // Peak usage by hour
+    const hourlyUsage = {};
+    entries.forEach(entry => {
+        const hour = new Date(entry.timestamp).getHours();
+        if (!hourlyUsage[hour]) {
+            hourlyUsage[hour] = { tokens: 0, calls: 0 };
+        }
+        hourlyUsage[hour].tokens += entry.tokensUsed;
+        hourlyUsage[hour].calls += entry.modelCalls;
+    });
+
+    const peakHour = Object.entries(hourlyUsage)
+        .sort(([, a], [, b]) => b.tokens - a.tokens)[0];
+
+    if (peakHour) {
+        console.log(`🔥 Peak Usage Hour: ${peakHour[0]}:00 - ${parseInt(peakHour[0]) + 1}:00`);
+        console.log(`   Tokens: ${(peakHour[1].tokens / 1000000).toFixed(2)}M`);
+        console.log(`   Calls: ${peakHour[1].calls.toLocaleString()}`);
+    }
+
+    // Day of week pattern
+    const dailyUsage = {};
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    entries.forEach(entry => {
+        const day = new Date(entry.timestamp).getDay();
+        if (!dailyUsage[day]) {
+            dailyUsage[day] = { tokens: 0, calls: 0, entries: 0 };
+        }
+        dailyUsage[day].tokens += entry.tokensUsed;
+        dailyUsage[day].calls += entry.modelCalls;
+        dailyUsage[day].entries += 1;
+    });
+
+    const sortedDays = Object.entries(dailyUsage)
+        .sort(([, a], [, b]) => b.tokens - a.tokens);
+
+    if (sortedDays.length > 0) {
+        console.log('\n📅 Usage by Day of Week:');
+        sortedDays.forEach(([day, stats]) => {
+            const avgTokens = stats.tokens / (stats.entries || 1);
+            console.log(`   ${dayNames[day]}: ${(avgTokens / 1000).toFixed(0)}K tokens/entry (${stats.entries} entries)`);
+        });
+    }
+
+    // Growth rate
+    if (entries.length > 10) {
+        const recent = entries.slice(-10);
+        const older = entries.slice(0, 10);
+
+        const recentRate = (recent[recent.length - 1].tokensUsed - recent[0].tokensUsed) / recent.length;
+        const olderRate = (older[older.length - 1].tokensUsed - older[0].tokensUsed) / older.length;
+
+        const growthFactor = recentRate / (olderRate || 1);
+
+        console.log('\n📈 Usage Trend:');
+        if (growthFactor > 1.2) {
+            console.log(`   ⚠️  Usage increasing rapidly (${((growthFactor - 1) * 100).toFixed(0)}% faster)`);
+        } else if (growthFactor < 0.8) {
+            console.log(`   ✓ Usage decreasing (${((1 - growthFactor) * 100).toFixed(0)}% slower)`);
+        } else {
+            console.log(`   → Usage stable`);
+        }
+    }
+
+    console.log('');
+}
+
 export function runCLI(args) {
     const reportIndex = args.indexOf('--report');
     const reportType = reportIndex !== -1 ? args[reportIndex + 1] : 'summary';
@@ -132,8 +208,11 @@ function run(reportType, period) {
         case 'peak':
             generatePeakUsageReport(filteredEntries);
             break;
+        case 'insights':
+            generateInsights(filteredEntries);
+            break;
         default:
-            console.log('Unknown report type. Use: summary, rates, peak');
+            console.log('Unknown report type. Use: summary, rates, peak, insights');
     }
 }
 

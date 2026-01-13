@@ -1,5 +1,15 @@
 # Session Log
 
+## 2026-01-13
+- Implemented Phase 5: Diagnostics & Debugging
+    - Added `health-check` CLI command for system health diagnostics (config, data files, API credentials)
+    - Created `scripts/diagnostics.mjs` for detailed issue detection and system information
+    - Added `diagnose` CLI command to run comprehensive diagnostics
+    - Extended `scripts/analytics.mjs` with `generateInsights` function (peak hour, day-of-week patterns, usage trends)
+    - Added `insights` CLI command for usage pattern analysis
+    - Added 5 new tests to `tests/cli.test.js` for Phase 5 commands
+    - All 48 tests passing
+
 ## 2026-01-12
 - Implemented Phase 4: REST API for Local Integrations
     - Created `scripts/api-server.mjs` Express REST API server (localhost-only)
